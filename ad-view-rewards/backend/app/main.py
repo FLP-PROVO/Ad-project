@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.routers import ads, auth, viewers
+from app.routers import ads, auth, users, viewers
 
 app = FastAPI(title="Ad View Rewards API", version="0.1.0")
 
@@ -11,5 +11,6 @@ def health_check() -> dict[str, str]:
 
 
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(users.router, prefix="/api/v1/users", tags=["users"])
 app.include_router(viewers.router, prefix="/api/v1/viewers", tags=["viewers"])
 app.include_router(ads.router, prefix="/api/v1/ads", tags=["ads"])
