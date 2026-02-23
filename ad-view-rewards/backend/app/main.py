@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.routers import admin_ads, ads, auth, users, viewers
+from app.routers import admin_ads, admin_gift_codes, ads, auth, users, viewers
 
 app = FastAPI(title="Ad View Rewards API", version="0.1.0")
 
@@ -16,3 +16,5 @@ app.include_router(viewers.router, prefix="/api/v1/viewers", tags=["viewers"])
 app.include_router(ads.router, prefix="/api/v1/ads", tags=["ads"])
 
 app.include_router(admin_ads.router, prefix="/api/v1/admin", tags=["admin-ads"])
+
+app.include_router(admin_gift_codes.router, prefix="/api/v1/admin", tags=["admin-gift-codes"])
