@@ -52,6 +52,8 @@ def test_start_then_complete_creates_ledger_and_decrements_budget(client, db_ses
     assert ledger_entries[0].change == 15
     assert ledger_entries[0].reason == "ad_reward"
 
+    db_session.expire_all()
+    db_session.expire_all()
     updated_ad = db_session.query(Ad).filter(Ad.id == ad.id).first()
     assert updated_ad is not None
     assert updated_ad.remaining_budget == 85
@@ -72,6 +74,7 @@ def test_complete_is_idempotent_and_does_not_duplicate_reward(client, db_session
     ledger_entries = db_session.query(PointsLedger).filter(PointsLedger.user_id == viewer.id).all()
     assert len(ledger_entries) == 1
 
+    db_session.expire_all()
     updated_ad = db_session.query(Ad).filter(Ad.id == ad.id).first()
     assert updated_ad is not None
     assert updated_ad.remaining_budget == 80

@@ -1,3 +1,5 @@
+import uuid
+
 from sqlalchemy.orm import Session
 
 from app.core.security import create_access_token, hash_password
@@ -50,7 +52,7 @@ def test_admin_can_create_ad_and_remaining_budget_is_initialized(client, db_sess
     assert body["remaining_budget"] == payload["budget"]
     assert body["reward_point"] == payload["reward_point"]
 
-    stored_ad = db_session.query(Ad).filter(Ad.id == body["id"]).first()
+    stored_ad = db_session.query(Ad).filter(Ad.id == uuid.UUID(body["id"])).first()
     assert stored_ad is not None
     assert stored_ad.remaining_budget == payload["budget"]
 

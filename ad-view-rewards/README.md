@@ -59,18 +59,21 @@ curl -i http://localhost:8000/api/v1/health
 
 ## テスト実行
 
-### 1) ローカル Python で実行
+### 1) docker-compose でローカル実行（推奨）
 
 ```bash
 cd ad-view-rewards/backend
-python -m pytest -q
+docker compose up -d db
+docker compose run --rm backend sh -c "pip install -r requirements.txt && flake8 . && pytest -q"
 ```
 
-### 2) Docker コンテナで実行
+### 2) ローカル Python で実行
 
 ```bash
 cd ad-view-rewards/backend
-docker compose run --rm backend pytest -q
+pip install -r requirements.txt
+flake8 .
+python -m pytest -q
 ```
 
 ## 停止・後片付け
