@@ -1,0 +1,1376 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Ad View Rewards API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health Check",
+        "operationId": "health_check_api_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Service health status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Check Api V1 Health Get"
+                },
+                "examples": {
+                  "healthy": {
+                    "summary": "Healthy response",
+                    "value": {
+                      "status": "ok"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/register": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Register",
+        "operationId": "register_api_v1_auth_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCreate",
+                "examples": [
+                  {
+                    "email": "viewer@example.com",
+                    "password": "strong-password",
+                    "phone_number": "+81-90-1234-5678"
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "User registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                },
+                "examples": {
+                  "registered": {
+                    "value": {
+                      "access_token": "<jwt-token>",
+                      "token_type": "bearer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Login",
+        "operationId": "login_api_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserLogin",
+                "examples": [
+                  {
+                    "email": "viewer@example.com",
+                    "password": "strong-password"
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "User authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "access_token": "<jwt-token>",
+                      "token_type": "bearer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/me": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Read Me",
+        "operationId": "read_me_api_v1_users_me_get",
+        "responses": {
+          "200": {
+            "description": "Current user profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserRead"
+                },
+                "examples": {
+                  "viewer_profile": {
+                    "value": {
+                      "id": "17cf3f5f-03bb-492a-bbc4-34a6ad4a4353",
+                      "email": "viewer@example.com",
+                      "role": "viewer",
+                      "phone_number": "+81-90-1234-5678",
+                      "created_at": "2026-10-01T12:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/users/me/balance": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Read My Balance",
+        "operationId": "read_my_balance_api_v1_users_me_balance_get",
+        "responses": {
+          "200": {
+            "description": "Current user points balance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BalanceRead"
+                },
+                "examples": {
+                  "balance": {
+                    "value": {
+                      "balance": 120
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/users/me/ledger": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Read My Ledger",
+        "operationId": "read_my_ledger_api_v1_users_me_ledger_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "examples": [
+                1
+              ],
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "examples": [
+                20
+              ],
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current user points ledger",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LedgerPageRead"
+                },
+                "examples": {
+                  "ledger_page": {
+                    "value": {
+                      "page": 1,
+                      "limit": 20,
+                      "total": 1,
+                      "items": [
+                        {
+                          "id": "3f4f8e0e-c20b-4e5c-a0ee-5845a99759d9",
+                          "user_id": "17cf3f5f-03bb-492a-bbc4-34a6ad4a4353",
+                          "change": 50,
+                          "reason": "ad_reward",
+                          "reference_id": "01c10ea3-18de-4caf-9f63-983f535dfdc0",
+                          "created_at": "2026-10-03T10:00:00Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/viewers": {
+      "get": {
+        "tags": [
+          "viewers"
+        ],
+        "summary": "Viewers placeholder",
+        "operationId": "viewers_placeholder_api_v1_viewers_get",
+        "responses": {
+          "200": {
+            "description": "Viewers placeholder response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Viewers Placeholder Api V1 Viewers Get"
+                },
+                "examples": {
+                  "placeholder": {
+                    "value": {
+                      "message": "viewers router placeholder"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ads/available": {
+      "get": {
+        "tags": [
+          "ads"
+        ],
+        "summary": "List Available Ads",
+        "operationId": "list_available_ads_api_v1_ads_available_get",
+        "responses": {
+          "200": {
+            "description": "Active ads available for viewing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AdRead"
+                  },
+                  "type": "array",
+                  "title": "Response List Available Ads Api V1 Ads Available Get"
+                },
+                "examples": {
+                  "available_ads": {
+                    "value": [
+                      {
+                        "id": "2ffba427-9124-4965-b502-68a035ecf55a",
+                        "advertiser_id": "5fba7f47-b6d5-4ca9-a18a-b76266b6ee95",
+                        "title": "Gaming Headset Promo",
+                        "video_url": "https://example.com/video.mp4",
+                        "reward_point": 10,
+                        "budget": 100,
+                        "remaining_budget": 90,
+                        "is_active": true,
+                        "created_at": "2026-10-05T12:00:00Z"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/ads/{ad_id}/start": {
+      "post": {
+        "tags": [
+          "ads"
+        ],
+        "summary": "Start Ad View",
+        "operationId": "start_ad_view_api_v1_ads__ad_id__start_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ad_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "examples": [
+                "2ffba427-9124-4965-b502-68a035ecf55a"
+              ],
+              "title": "Ad Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Ad view started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdViewRead"
+                },
+                "examples": {
+                  "started": {
+                    "value": {
+                      "id": "01c10ea3-18de-4caf-9f63-983f535dfdc0",
+                      "ad_id": "2ffba427-9124-4965-b502-68a035ecf55a",
+                      "viewer_id": "17cf3f5f-03bb-492a-bbc4-34a6ad4a4353",
+                      "started_at": "2026-10-05T12:30:00Z",
+                      "completed": false,
+                      "reward_granted": false,
+                      "created_at": "2026-10-05T12:30:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ads/{ad_id}/complete": {
+      "post": {
+        "tags": [
+          "ads"
+        ],
+        "summary": "Complete Ad View",
+        "operationId": "complete_ad_view_api_v1_ads__ad_id__complete_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ad_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "examples": [
+                "2ffba427-9124-4965-b502-68a035ecf55a"
+              ],
+              "title": "Ad Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ad view completed and reward granted if eligible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdViewRead"
+                },
+                "examples": {
+                  "completed": {
+                    "value": {
+                      "id": "01c10ea3-18de-4caf-9f63-983f535dfdc0",
+                      "ad_id": "2ffba427-9124-4965-b502-68a035ecf55a",
+                      "viewer_id": "17cf3f5f-03bb-492a-bbc4-34a6ad4a4353",
+                      "started_at": "2026-10-05T12:30:00Z",
+                      "completed_at": "2026-10-05T12:31:00Z",
+                      "completed": true,
+                      "reward_granted": true,
+                      "created_at": "2026-10-05T12:30:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/ads": {
+      "get": {
+        "tags": [
+          "admin-ads"
+        ],
+        "summary": "List Ads",
+        "operationId": "list_ads_api_v1_admin_ads_get",
+        "responses": {
+          "200": {
+            "description": "Admin ad list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AdRead"
+                  },
+                  "type": "array",
+                  "title": "Response List Ads Api V1 Admin Ads Get"
+                },
+                "examples": {
+                  "ads": {
+                    "value": [
+                      {
+                        "id": "2ffba427-9124-4965-b502-68a035ecf55a",
+                        "advertiser_id": "5fba7f47-b6d5-4ca9-a18a-b76266b6ee95",
+                        "title": "Gaming Headset Promo",
+                        "video_url": "https://example.com/video.mp4",
+                        "reward_point": 10,
+                        "budget": 100,
+                        "remaining_budget": 100,
+                        "is_active": true,
+                        "created_at": "2026-10-05T12:00:00Z"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "admin-ads"
+        ],
+        "summary": "Create Ad",
+        "operationId": "create_ad_api_v1_admin_ads_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdCreate",
+                "examples": [
+                  {
+                    "advertiser_id": "5fba7f47-b6d5-4ca9-a18a-b76266b6ee95",
+                    "title": "Gaming Headset Promo",
+                    "video_url": "https://example.com/video.mp4",
+                    "reward_point": 10,
+                    "budget": 100,
+                    "is_active": true
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Ad created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdRead"
+                },
+                "examples": {
+                  "created": {
+                    "value": {
+                      "id": "2ffba427-9124-4965-b502-68a035ecf55a",
+                      "advertiser_id": "5fba7f47-b6d5-4ca9-a18a-b76266b6ee95",
+                      "title": "Gaming Headset Promo",
+                      "video_url": "https://example.com/video.mp4",
+                      "reward_point": 10,
+                      "budget": 100,
+                      "remaining_budget": 100,
+                      "is_active": true,
+                      "created_at": "2026-10-05T12:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/gift-codes": {
+      "post": {
+        "tags": [
+          "admin-gift-codes"
+        ],
+        "summary": "Upload Gift Codes",
+        "operationId": "upload_gift_codes_api_v1_admin_gift_codes_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "examples": [
+                "amazon"
+              ],
+              "title": "Provider"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Gift codes uploaded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GiftCodeRead"
+                  },
+                  "title": "Response Upload Gift Codes Api V1 Admin Gift Codes Post"
+                },
+                "examples": {
+                  "uploaded": {
+                    "value": [
+                      {
+                        "id": "acecf050-e315-4db0-99ca-fdc7af77ec19",
+                        "code": "CODE-001",
+                        "provider": "amazon",
+                        "redeemed": false,
+                        "created_at": "2026-10-05T14:00:00Z"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "json_with_provider": {
+                  "value": {
+                    "provider": "amazon",
+                    "codes": [
+                      "CODE-001",
+                      "CODE-002"
+                    ]
+                  }
+                },
+                "json_with_query_provider": {
+                  "value": [
+                    "CODE-001",
+                    "CODE-002"
+                  ]
+                }
+              }
+            },
+            "text/csv": {
+              "examples": {
+                "csv": {
+                  "value": "code\nCODE-001\nCODE-002"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "admin-gift-codes"
+        ],
+        "summary": "List Gift Codes",
+        "operationId": "list_gift_codes_api_v1_admin_gift_codes_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "redeemed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "examples": [
+                false
+              ],
+              "title": "Redeemed"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Gift code list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GiftCodeRead"
+                  },
+                  "title": "Response List Gift Codes Api V1 Admin Gift Codes Get"
+                },
+                "examples": {
+                  "codes": {
+                    "value": [
+                      {
+                        "id": "acecf050-e315-4db0-99ca-fdc7af77ec19",
+                        "code": "CODE-001",
+                        "provider": "amazon",
+                        "redeemed": false,
+                        "created_at": "2026-10-05T14:00:00Z"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/redeem-code": {
+      "post": {
+        "tags": [
+          "admin-gift-codes"
+        ],
+        "summary": "Assign Gift Code",
+        "operationId": "assign_gift_code_api_v1_admin_redeem_code_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GiftCodeRedeemRequest",
+                "examples": [
+                  {
+                    "code": "CODE-001",
+                    "user_id": "17cf3f5f-03bb-492a-bbc4-34a6ad4a4353"
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Gift code assigned to user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GiftCodeRead"
+                },
+                "examples": {
+                  "assigned": {
+                    "value": {
+                      "id": "acecf050-e315-4db0-99ca-fdc7af77ec19",
+                      "code": "CODE-001",
+                      "provider": "amazon",
+                      "assigned_to_user_id": "17cf3f5f-03bb-492a-bbc4-34a6ad4a4353",
+                      "redeemed": false,
+                      "created_at": "2026-10-05T14:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AdCreate": {
+        "properties": {
+          "advertiser_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Advertiser Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "video_url": {
+            "type": "string",
+            "title": "Video Url"
+          },
+          "reward_point": {
+            "type": "integer",
+            "title": "Reward Point"
+          },
+          "budget": {
+            "type": "integer",
+            "title": "Budget"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "video_url",
+          "reward_point",
+          "budget"
+        ],
+        "title": "AdCreate"
+      },
+      "AdRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "advertiser_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Advertiser Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "video_url": {
+            "type": "string",
+            "title": "Video Url"
+          },
+          "reward_point": {
+            "type": "integer",
+            "title": "Reward Point"
+          },
+          "budget": {
+            "type": "integer",
+            "title": "Budget"
+          },
+          "remaining_budget": {
+            "type": "integer",
+            "title": "Remaining Budget"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "advertiser_id",
+          "title",
+          "video_url",
+          "reward_point",
+          "budget",
+          "remaining_budget",
+          "is_active",
+          "created_at"
+        ],
+        "title": "AdRead"
+      },
+      "AdViewRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "ad_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Ad Id"
+          },
+          "viewer_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Viewer Id"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "completed": {
+            "type": "boolean",
+            "title": "Completed"
+          },
+          "reward_granted": {
+            "type": "boolean",
+            "title": "Reward Granted"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "ad_id",
+          "viewer_id",
+          "started_at",
+          "completed_at",
+          "completed",
+          "reward_granted",
+          "created_at"
+        ],
+        "title": "AdViewRead"
+      },
+      "BalanceRead": {
+        "properties": {
+          "balance": {
+            "type": "integer",
+            "title": "Balance"
+          }
+        },
+        "type": "object",
+        "required": [
+          "balance"
+        ],
+        "title": "BalanceRead"
+      },
+      "GiftCodeRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "assigned_to_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned To User Id"
+          },
+          "redeemed": {
+            "type": "boolean",
+            "title": "Redeemed"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "provider",
+          "assigned_to_user_id",
+          "redeemed",
+          "created_at"
+        ],
+        "title": "GiftCodeRead"
+      },
+      "GiftCodeRedeemRequest": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Code"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "user_id"
+        ],
+        "title": "GiftCodeRedeemRequest"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LedgerEntryRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "change": {
+            "type": "integer",
+            "title": "Change"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "reference_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Reference Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "change",
+          "reason",
+          "reference_id",
+          "created_at"
+        ],
+        "title": "LedgerEntryRead"
+      },
+      "LedgerPageRead": {
+        "properties": {
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LedgerEntryRead"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "page",
+          "limit",
+          "total",
+          "items"
+        ],
+        "title": "LedgerPageRead"
+      },
+      "TokenResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token"
+        ],
+        "title": "TokenResponse"
+      },
+      "UserCreate": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          },
+          "phone_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Number"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "UserCreate"
+      },
+      "UserLogin": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "UserLogin"
+      },
+      "UserRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
+          },
+          "phone_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Number"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "role",
+          "phone_number",
+          "created_at"
+        ],
+        "title": "UserRead"
+      },
+      "UserRole": {
+        "type": "string",
+        "enum": [
+          "viewer",
+          "advertiser",
+          "admin"
+        ],
+        "title": "UserRole"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "OAuth2PasswordBearer": {
+        "type": "oauth2",
+        "flows": {
+          "password": {
+            "scopes": {},
+            "tokenUrl": "/api/v1/auth/login"
+          }
+        }
+      }
+    }
+  }
+}

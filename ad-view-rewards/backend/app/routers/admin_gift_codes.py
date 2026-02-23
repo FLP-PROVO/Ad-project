@@ -2,7 +2,7 @@ import csv
 import io
 import re
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.security import get_current_admin
@@ -49,10 +49,63 @@ def _normalize_and_validate_codes(codes: list[str]) -> list[str]:
     return normalized
 
 
-@router.post('/gift-codes', response_model=list[GiftCodeRead], status_code=status.HTTP_201_CREATED)
+@router.post(
+    '/gift-codes',
+    response_model=list[GiftCodeRead],
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        201: {
+            "description": "Gift codes uploaded",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "uploaded": {
+                            "value": [
+                                {
+                                    "id": "acecf050-e315-4db0-99ca-fdc7af77ec19",
+                                    "code": "CODE-001",
+                                    "provider": "amazon",
+                                    "assigned_to_user_id": None,
+                                    "redeemed": False,
+                                    "created_at": "2026-10-05T14:00:00Z",
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+        }
+    },
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "json_with_provider": {
+                            "value": {
+                                "provider": "amazon",
+                                "codes": ["CODE-001", "CODE-002"],
+                            }
+                        },
+                        "json_with_query_provider": {
+                            "value": ["CODE-001", "CODE-002"]
+                        },
+                    }
+                },
+                "text/csv": {
+                    "examples": {
+                        "csv": {
+                            "value": "code\nCODE-001\nCODE-002"
+                        }
+                    }
+                },
+            }
+        }
+    },
+)
 async def upload_gift_codes(
     request: Request,
-    provider: str | None = Query(default=None),
+    provider: str | None = Query(default=None, examples=["amazon"]),
     db: Session = Depends(get_db),
     _admin: User = Depends(get_current_admin),
 ) -> list[GiftCodeRead]:
@@ -106,9 +159,35 @@ async def upload_gift_codes(
     return [GiftCodeRead.model_validate(row) for row in created_rows]
 
 
-@router.get('/gift-codes', response_model=list[GiftCodeRead])
+@router.get(
+    '/gift-codes',
+    response_model=list[GiftCodeRead],
+    responses={
+        200: {
+            "description": "Gift code list",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "codes": {
+                            "value": [
+                                {
+                                    "id": "acecf050-e315-4db0-99ca-fdc7af77ec19",
+                                    "code": "CODE-001",
+                                    "provider": "amazon",
+                                    "assigned_to_user_id": None,
+                                    "redeemed": False,
+                                    "created_at": "2026-10-05T14:00:00Z",
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+        }
+    },
+)
 def list_gift_codes(
-    redeemed: bool | None = Query(default=None),
+    redeemed: bool | None = Query(default=None, examples=[False]),
     db: Session = Depends(get_db),
     _admin: User = Depends(get_current_admin),
 ) -> list[GiftCodeRead]:
@@ -120,9 +199,41 @@ def list_gift_codes(
     return [GiftCodeRead.model_validate(row) for row in rows]
 
 
-@router.post('/redeem-code', response_model=GiftCodeRead)
+@router.post(
+    '/redeem-code',
+    response_model=GiftCodeRead,
+    responses={
+        200: {
+            "description": "Gift code assigned to user",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "assigned": {
+                            "value": {
+                                "id": "acecf050-e315-4db0-99ca-fdc7af77ec19",
+                                "code": "CODE-001",
+                                "provider": "amazon",
+                                "assigned_to_user_id": "17cf3f5f-03bb-492a-bbc4-34a6ad4a4353",
+                                "redeemed": False,
+                                "created_at": "2026-10-05T14:00:00Z",
+                            }
+                        }
+                    }
+                }
+            },
+        }
+    },
+)
 def assign_gift_code(
-    payload: GiftCodeRedeemRequest,
+    payload: GiftCodeRedeemRequest = Body(
+        ...,
+        examples=[
+            {
+                "code": "CODE-001",
+                "user_id": "17cf3f5f-03bb-492a-bbc4-34a6ad4a4353",
+            }
+        ],
+    ),
     db: Session = Depends(get_db),
     _admin: User = Depends(get_current_admin),
 ) -> GiftCodeRead:
