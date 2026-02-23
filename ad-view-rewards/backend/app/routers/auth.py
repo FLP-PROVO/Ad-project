@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.security import create_access_token, hash_password, verify_password
@@ -9,8 +9,41 @@ from app.schemas.user import TokenResponse, UserCreate, UserLogin
 router = APIRouter()
 
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-def register(payload: UserCreate, db: Session = Depends(get_db)) -> TokenResponse:
+@router.post(
+    "/register",
+    response_model=TokenResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        201: {
+            "description": "User registered",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "registered": {
+                            "value": {
+                                "access_token": "<jwt-token>",
+                                "token_type": "bearer",
+                            }
+                        }
+                    }
+                }
+            },
+        }
+    },
+)
+def register(
+    payload: UserCreate = Body(
+        ...,
+        examples=[
+            {
+                "email": "viewer@example.com",
+                "password": "strong-password",
+                "phone_number": "+81-90-1234-5678",
+            }
+        ],
+    ),
+    db: Session = Depends(get_db),
+) -> TokenResponse:
     existing_user = db.query(User).filter(User.email == payload.email).first()
     if existing_user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
@@ -29,8 +62,39 @@ def register(payload: UserCreate, db: Session = Depends(get_db)) -> TokenRespons
     return TokenResponse(access_token=token)
 
 
-@router.post("/login", response_model=TokenResponse)
-def login(payload: UserLogin, db: Session = Depends(get_db)) -> TokenResponse:
+@router.post(
+    "/login",
+    response_model=TokenResponse,
+    responses={
+        200: {
+            "description": "User authenticated",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "success": {
+                            "value": {
+                                "access_token": "<jwt-token>",
+                                "token_type": "bearer",
+                            }
+                        }
+                    }
+                }
+            },
+        }
+    },
+)
+def login(
+    payload: UserLogin = Body(
+        ...,
+        examples=[
+            {
+                "email": "viewer@example.com",
+                "password": "strong-password",
+            }
+        ],
+    ),
+    db: Session = Depends(get_db),
+) -> TokenResponse:
     user = db.query(User).filter(User.email == payload.email).first()
     if user is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")

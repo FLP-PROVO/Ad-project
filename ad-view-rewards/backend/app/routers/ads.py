@@ -1,8 +1,9 @@
 import uuid
 import hashlib
 from datetime import datetime, timezone
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Request, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -27,7 +28,36 @@ def _build_client_info(request: Request) -> dict[str, str | None]:
     }
 
 
-@router.get("/available", response_model=list[AdRead])
+@router.get(
+    "/available",
+    response_model=list[AdRead],
+    responses={
+        200: {
+            "description": "Active ads available for viewing",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "available_ads": {
+                            "value": [
+                                {
+                                    "id": "2ffba427-9124-4965-b502-68a035ecf55a",
+                                    "advertiser_id": "5fba7f47-b6d5-4ca9-a18a-b76266b6ee95",
+                                    "title": "Gaming Headset Promo",
+                                    "video_url": "https://example.com/video.mp4",
+                                    "reward_point": 10,
+                                    "budget": 100,
+                                    "remaining_budget": 90,
+                                    "is_active": True,
+                                    "created_at": "2026-10-05T12:00:00Z",
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+        }
+    },
+)
 def list_available_ads(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -42,9 +72,36 @@ def list_available_ads(
     return [AdRead.model_validate(ad) for ad in ads]
 
 
-@router.post("/{ad_id}/start", response_model=AdViewRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{ad_id}/start",
+    response_model=AdViewRead,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        201: {
+            "description": "Ad view started",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "started": {
+                            "value": {
+                                "id": "01c10ea3-18de-4caf-9f63-983f535dfdc0",
+                                "ad_id": "2ffba427-9124-4965-b502-68a035ecf55a",
+                                "viewer_id": "17cf3f5f-03bb-492a-bbc4-34a6ad4a4353",
+                                "started_at": "2026-10-05T12:30:00Z",
+                                "completed_at": None,
+                                "completed": False,
+                                "reward_granted": False,
+                                "created_at": "2026-10-05T12:30:00Z",
+                            }
+                        }
+                    }
+                }
+            },
+        }
+    },
+)
 def start_ad_view(
-    ad_id: uuid.UUID,
+    ad_id: Annotated[uuid.UUID, Path(examples=["2ffba427-9124-4965-b502-68a035ecf55a"])],
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -79,9 +136,35 @@ def start_ad_view(
     return AdViewRead.model_validate(ad_view)
 
 
-@router.post("/{ad_id}/complete", response_model=AdViewRead)
+@router.post(
+    "/{ad_id}/complete",
+    response_model=AdViewRead,
+    responses={
+        200: {
+            "description": "Ad view completed and reward granted if eligible",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "completed": {
+                            "value": {
+                                "id": "01c10ea3-18de-4caf-9f63-983f535dfdc0",
+                                "ad_id": "2ffba427-9124-4965-b502-68a035ecf55a",
+                                "viewer_id": "17cf3f5f-03bb-492a-bbc4-34a6ad4a4353",
+                                "started_at": "2026-10-05T12:30:00Z",
+                                "completed_at": "2026-10-05T12:31:00Z",
+                                "completed": True,
+                                "reward_granted": True,
+                                "created_at": "2026-10-05T12:30:00Z",
+                            }
+                        }
+                    }
+                }
+            },
+        }
+    },
+)
 def complete_ad_view(
-    ad_id: uuid.UUID,
+    ad_id: Annotated[uuid.UUID, Path(examples=["2ffba427-9124-4965-b502-68a035ecf55a"])],
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> AdViewRead:
