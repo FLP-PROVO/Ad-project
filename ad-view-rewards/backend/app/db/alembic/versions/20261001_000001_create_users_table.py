@@ -1,7 +1,7 @@
 """create users table
 
 Revision ID: 20261001_000001
-Revises: 
+Revises:
 Create Date: 2026-10-01 00:00:01
 """
 
