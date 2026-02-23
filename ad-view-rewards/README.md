@@ -85,3 +85,16 @@ DB ボリュームも削除する場合:
 ```bash
 docker compose down -v
 ```
+
+
+## フロントエンド（Next.js）
+
+最小限の閲覧者フロー UI は `frontend/` にあります。
+
+```bash
+cd ad-view-rewards/frontend
+npm install
+npm run dev
+```
+
+詳細は `frontend/README.md` を参照してください。
