@@ -97,3 +97,25 @@ def test_same_user_cannot_claim_same_ad_reward_twice(client, db_session: Session
 
     ledger_entries = db_session.query(PointsLedger).filter(PointsLedger.user_id == viewer.id).all()
     assert len(ledger_entries) == 1
+
+
+def test_available_ads_returns_only_active_with_budget(client, db_session: Session) -> None:
+    _, token = _create_viewer_with_token(db_session, email='viewer-available@example.com')
+
+    eligible_ad = _create_ad(db_session, reward_point=10, budget=50)
+    ineligible_ad = _create_ad(db_session, reward_point=100, budget=100)
+    ineligible_ad.remaining_budget = 10
+    db_session.commit()
+
+    inactive_ad = _create_ad(db_session, reward_point=10, budget=50)
+    inactive_ad.is_active = False
+    db_session.commit()
+
+    response = client.get('/api/v1/ads/available', headers={'Authorization': f'Bearer {token}'})
+    assert response.status_code == 200
+
+    body = response.json()
+    ad_ids = {item['id'] for item in body}
+    assert str(eligible_ad.id) in ad_ids
+    assert str(ineligible_ad.id) not in ad_ids
+    assert str(inactive_ad.id) not in ad_ids

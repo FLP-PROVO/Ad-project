@@ -1,0 +1,59 @@
+:root {
+  font-family: Arial, sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: #f7f7f7;
+  color: #111;
+}
+
+main {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+input, button {
+  font-size: 14px;
+  padding: 8px;
+  margin: 4px 0;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: #1155cc;
+}
+
+.error {
+  color: #b00020;
+}
+
+.success {
+  color: #047857;
+}
+
+nav {
+  background: #fff;
+  border-bottom: 1px solid #ddd;
+}
+
+nav ul {
+  margin: 0;
+  padding: 12px 24px;
+  display: flex;
+  gap: 12px;
+  list-style: none;
+}

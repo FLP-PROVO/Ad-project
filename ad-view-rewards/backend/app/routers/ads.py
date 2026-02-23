@@ -12,6 +12,7 @@ from app.models.ad import Ad
 from app.models.ad_view import AdView
 from app.models.points_ledger import PointsLedger
 from app.models.user import User
+from app.schemas.ad import AdRead
 from app.schemas.ad_view import AdViewRead
 
 router = APIRouter()
@@ -24,6 +25,21 @@ def _build_client_info(request: Request) -> dict[str, str | None]:
         "user_agent": request.headers.get("user-agent"),
         "ip_hash": ip_hash,
     }
+
+
+@router.get("/available", response_model=list[AdRead])
+def list_available_ads(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[AdRead]:
+    del current_user
+    ads = (
+        db.query(Ad)
+        .filter(Ad.is_active.is_(True), Ad.remaining_budget >= Ad.reward_point)
+        .order_by(Ad.created_at.desc())
+        .all()
+    )
+    return [AdRead.model_validate(ad) for ad in ads]
 
 
 @router.post("/{ad_id}/start", response_model=AdViewRead, status_code=status.HTTP_201_CREATED)
