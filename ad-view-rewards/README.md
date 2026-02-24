@@ -6,6 +6,7 @@
 
 - Docker
 - Docker Compose (`docker compose` コマンド)
+- `backend/Dockerfile` では将来 `ffprobe` を使うために `ffmpeg` をインストールしておく必要があります（Task10 では未実行）。
 
 ## ディレクトリ構成
 
@@ -56,6 +57,15 @@ curl -i http://localhost:8000/api/v1/health
 
 - HTTP 200
 - Body: `{"status":"ok"}`
+
+## マイグレーション実行手順
+
+```bash
+cd ad-view-rewards/backend
+alembic upgrade head
+```
+
+DB変更を取り込む際は上記を実行してください。
 
 ## テスト実行
 

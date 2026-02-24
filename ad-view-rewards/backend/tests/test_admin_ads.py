@@ -51,10 +51,18 @@ def test_admin_can_create_ad_and_remaining_budget_is_initialized(client, db_sess
     assert body["title"] == payload["title"]
     assert body["remaining_budget"] == payload["budget"]
     assert body["reward_point"] == payload["reward_point"]
+    assert body["file_path"] is None
+    assert body["duration_seconds"] is None
+    assert body["file_size_bytes"] is None
+    assert body["status"] == "uploading"
 
     stored_ad = db_session.query(Ad).filter(Ad.id == uuid.UUID(body["id"])).first()
     assert stored_ad is not None
     assert stored_ad.remaining_budget == payload["budget"]
+    assert stored_ad.file_path is None
+    assert stored_ad.duration_seconds is None
+    assert stored_ad.file_size_bytes is None
+    assert stored_ad.status == "uploading"
 
 
 def test_admin_ads_requires_admin_role(client, db_session: Session) -> None:
@@ -101,3 +109,32 @@ def test_create_ad_validation_rejects_budget_smaller_than_reward(client, db_sess
     )
 
     assert response.status_code == 422
+
+
+def test_admin_ads_list_includes_file_metadata_fields(client, db_session: Session) -> None:
+    admin_token = _create_admin_token(db_session)
+    ad = Ad(
+        title="Schema check",
+        video_url="https://example.com/schema.mp4",
+        reward_point=10,
+        budget=100,
+        remaining_budget=100,
+        is_active=True,
+        status="ready",
+    )
+    db_session.add(ad)
+    db_session.commit()
+
+    response = client.get(
+        "/api/v1/admin/ads",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) >= 1
+    first = body[0]
+    assert "file_path" in first
+    assert "duration_seconds" in first
+    assert "file_size_bytes" in first
+    assert "status" in first
