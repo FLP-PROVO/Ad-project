@@ -67,6 +67,9 @@ alembic upgrade head
 
 DB変更を取り込む際は上記を実行してください。
 
+`ad_views` は視聴開始/完了・報酬状態・`client_info` (JSONB) を保持します。
+日次の重複防止インデックス `ux_ad_view_user_ad_date` を使用するため、既存データに重複がある環境で導入する場合は事前クレンジングが必要です。
+
 ## テスト実行
 
 ### 1) docker-compose でローカル実行（推奨）

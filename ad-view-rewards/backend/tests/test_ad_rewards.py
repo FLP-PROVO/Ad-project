@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import create_access_token, hash_password
 from app.models.ad import Ad
-from app.models.ad_view import AdView
+from app.models.ad_views import AdView
 from app.models.points_ledger import PointsLedger
 from app.models.user import User, UserRole
 
@@ -38,14 +38,14 @@ def test_start_then_complete_creates_ledger_and_decrements_budget(client, db_ses
     start_response = client.post(f"/api/v1/ads/{ad.id}/start", headers={"Authorization": f"Bearer {token}"})
     assert start_response.status_code == 201
     start_body = start_response.json()
-    assert start_body["completed"] is False
-    assert start_body["reward_granted"] is False
+    assert start_body["completed_at"] is None
+    assert start_body["rewarded"] is False
 
     complete_response = client.post(f"/api/v1/ads/{ad.id}/complete", headers={"Authorization": f"Bearer {token}"})
     assert complete_response.status_code == 200
     complete_body = complete_response.json()
-    assert complete_body["completed"] is True
-    assert complete_body["reward_granted"] is True
+    assert complete_body["completed_at"] is not None
+    assert complete_body["rewarded"] is True
 
     ledger_entries = db_session.query(PointsLedger).filter(PointsLedger.user_id == viewer.id).all()
     assert len(ledger_entries) == 1
@@ -96,7 +96,7 @@ def test_same_user_cannot_claim_same_ad_reward_twice(client, db_session: Session
 
     ad_views = db_session.query(AdView).filter(AdView.ad_id == ad.id, AdView.viewer_id == viewer.id).all()
     assert len(ad_views) == 1
-    assert ad_views[0].reward_granted is True
+    assert ad_views[0].rewarded is True
 
     ledger_entries = db_session.query(PointsLedger).filter(PointsLedger.user_id == viewer.id).all()
     assert len(ledger_entries) == 1

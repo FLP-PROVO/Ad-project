@@ -10,11 +10,12 @@ from sqlalchemy.orm import Session
 from app.core.security import get_current_user
 from app.db.base import get_db
 from app.models.ad import Ad
-from app.models.ad_view import AdView
+from app.models.ad_views import AdView
 from app.models.points_ledger import PointsLedger
+from app.services.ad_views_service import create_ad_view
 from app.models.user import User
 from app.schemas.ad import AdRead
-from app.schemas.ad_view import AdViewRead
+from app.schemas.ad_views import AdViewResponse
 
 router = APIRouter()
 
@@ -74,7 +75,7 @@ def list_available_ads(
 
 @router.post(
     "/{ad_id}/start",
-    response_model=AdViewRead,
+    response_model=AdViewResponse,
     status_code=status.HTTP_201_CREATED,
     responses={
         201: {
@@ -89,8 +90,11 @@ def list_available_ads(
                                 "viewer_id": "17cf3f5f-03bb-492a-bbc4-34a6ad4a4353",
                                 "started_at": "2026-10-05T12:30:00Z",
                                 "completed_at": None,
-                                "completed": False,
-                                "reward_granted": False,
+                                "watched_seconds": None,
+                                "completion_rate": None,
+                                "rewarded": False,
+                                "rewarded_points": 0,
+                                "client_info": {"user_agent": "Mozilla/5.0", "ip_hash": "abc"},
                                 "created_at": "2026-10-05T12:30:00Z",
                             }
                         }
@@ -105,40 +109,30 @@ def start_ad_view(
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> AdViewRead:
+) -> AdViewResponse:
     ad = db.query(Ad).filter(Ad.id == ad_id).first()
     if ad is None or not ad.is_active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Active ad not found")
 
     existing = db.query(AdView).filter(AdView.ad_id == ad.id, AdView.viewer_id == current_user.id).first()
     if existing:
-        return AdViewRead.model_validate(existing)
+        return AdViewResponse.model_validate(existing)
 
-    ad_view = AdView(
-        ad_id=ad.id,
-        viewer_id=current_user.id,
-        started_at=datetime.now(timezone.utc),
-        completed=False,
-        reward_granted=False,
-        client_info=_build_client_info(request),
-    )
-    db.add(ad_view)
     try:
-        db.commit()
+        ad_view = create_ad_view(db, ad.id, current_user.id, _build_client_info(request))
     except IntegrityError:
         db.rollback()
         ad_view = db.query(AdView).filter(AdView.ad_id == ad.id, AdView.viewer_id == current_user.id).first()
         if ad_view is None:
             raise
-        return AdViewRead.model_validate(ad_view)
+        return AdViewResponse.model_validate(ad_view)
 
-    db.refresh(ad_view)
-    return AdViewRead.model_validate(ad_view)
+    return AdViewResponse.model_validate(ad_view)
 
 
 @router.post(
     "/{ad_id}/complete",
-    response_model=AdViewRead,
+    response_model=AdViewResponse,
     responses={
         200: {
             "description": "Ad view completed and reward granted if eligible",
@@ -152,8 +146,11 @@ def start_ad_view(
                                 "viewer_id": "17cf3f5f-03bb-492a-bbc4-34a6ad4a4353",
                                 "started_at": "2026-10-05T12:30:00Z",
                                 "completed_at": "2026-10-05T12:31:00Z",
-                                "completed": True,
-                                "reward_granted": True,
+                                "watched_seconds": None,
+                                "completion_rate": None,
+                                "rewarded": True,
+                                "rewarded_points": 10,
+                                "client_info": {"user_agent": "Mozilla/5.0", "ip_hash": "abc"},
                                 "created_at": "2026-10-05T12:30:00Z",
                             }
                         }
@@ -167,7 +164,7 @@ def complete_ad_view(
     ad_id: Annotated[uuid.UUID, Path(examples=["2ffba427-9124-4965-b502-68a035ecf55a"])],
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> AdViewRead:
+) -> AdViewResponse:
     ad = db.query(Ad).filter(Ad.id == ad_id).first()
     if ad is None or not ad.is_active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Active ad not found")
@@ -181,11 +178,10 @@ def complete_ad_view(
         ad = db.query(Ad).filter(Ad.id == ad.id).with_for_update().one()
         ad_view = db.query(AdView).filter(AdView.id == ad_view.id).with_for_update().one()
 
-        if not ad_view.completed:
-            ad_view.completed = True
+        if ad_view.completed_at is None:
             ad_view.completed_at = now
 
-        if ad_view.completed and not ad_view.reward_granted:
+        if not ad_view.rewarded:
             if ad.remaining_budget < ad.reward_point:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient ad budget")
 
@@ -197,8 +193,9 @@ def complete_ad_view(
             )
             db.add(ledger_entry)
             ad.remaining_budget -= ad.reward_point
-            ad_view.reward_granted = True
+            ad_view.rewarded = True
+            ad_view.rewarded_points = ad.reward_point
 
     db.commit()
     db.refresh(ad_view)
-    return AdViewRead.model_validate(ad_view)
+    return AdViewResponse.model_validate(ad_view)
