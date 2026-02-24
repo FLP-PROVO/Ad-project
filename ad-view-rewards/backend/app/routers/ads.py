@@ -4,17 +4,19 @@ from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Request, status
+
+from app.services.storage_service import LocalStorageService
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_current_viewer
 from app.db.base import get_db
 from app.models.ad import Ad
 from app.models.ad_views import AdView
 from app.models.points_ledger import PointsLedger
 from app.services.ad_views_service import create_ad_view
 from app.models.user import User
-from app.schemas.ad import AdRead
+from app.schemas.ad import AdAvailableRead, AdRead
 from app.schemas.ad_views import AdViewResponse
 
 router = APIRouter()
@@ -31,7 +33,7 @@ def _build_client_info(request: Request) -> dict[str, str | None]:
 
 @router.get(
     "/available",
-    response_model=list[AdRead],
+    response_model=list[AdAvailableRead],
     responses={
         200: {
             "description": "Active ads available for viewing",
@@ -61,16 +63,36 @@ def _build_client_info(request: Request) -> dict[str, str | None]:
 )
 def list_available_ads(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> list[AdRead]:
-    del current_user
+    current_user: User = Depends(get_current_viewer),
+) -> list[AdAvailableRead]:
     ads = (
         db.query(Ad)
-        .filter(Ad.is_active.is_(True), Ad.remaining_budget >= Ad.reward_point)
+        .filter(
+            Ad.status == "ready",
+            Ad.is_active.is_(True),
+            Ad.remaining_budget >= Ad.reward_point,
+            Ad.file_path.is_not(None),
+            Ad.duration_seconds.is_not(None),
+        )
         .order_by(Ad.created_at.desc())
         .all()
     )
-    return [AdRead.model_validate(ad) for ad in ads]
+
+    storage = LocalStorageService()
+    result: list[AdAvailableRead] = []
+    for ad in ads:
+        if ad.file_path is None or ad.duration_seconds is None:
+            continue
+        result.append(
+            AdAvailableRead(
+                id=ad.id,
+                title=ad.title,
+                reward_point=ad.reward_point,
+                duration_seconds=ad.duration_seconds,
+                video_url=storage.generate_signed_url(ad.file_path, current_user.id, expires_seconds=300),
+            )
+        )
+    return result
 
 
 @router.post(

@@ -138,3 +138,28 @@ npm run dev
 ```
 
 詳細は `frontend/README.md` を参照してください。
+
+## 視聴者向け広告取得と署名付き再生 URL
+
+- エンドポイント: `GET /api/v1/ads/available`
+- 認証: Bearer JWT（viewer ロール必須）
+- 返却条件: `status='ready'` かつ `is_active=true` かつ `remaining_budget >= reward_point`
+- レスポンス項目: `id`, `title`, `reward_point`, `duration_seconds`, `video_url`
+
+`video_url` は `StorageService.generate_signed_url(file_path, user_id, expires_seconds=300)` で生成されます。ローカル実装では次のトークン仕様を利用しています。
+
+- payload 必須項目: `path`, `user_id`, `expires` (UNIX timestamp)
+- 署名: `HMAC-SHA256(SECRET_KEY, f"{path}:{user_id}:{expires}")`
+- token 形式: `base64url(json(payload)) + "." + signature_hex`
+
+メディア配信ルート:
+
+- `GET /media/ads/{filename}?token=...`
+- token 未指定・期限切れ・改ざん・user 転用・path 不一致は `403 forbidden`
+- 配信は `StreamingResponse`（`video/mp4`）でチャンク送信
+- 検証失敗時は `timestamp`, `user_id`, `ip_hash`, `filename` をログに記録
+
+環境変数:
+
+- `SECRET_KEY`: 署名トークン用シークレット（コードに直書きしない）
+- `BASE_URL`: 署名 URL のホスト（例: `https://backend.example.com`）

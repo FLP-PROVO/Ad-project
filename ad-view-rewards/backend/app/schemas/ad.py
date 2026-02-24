@@ -42,3 +42,11 @@ class AdRead(BaseModel):
     remaining_budget: int
     is_active: bool
     created_at: datetime
+
+
+class AdAvailableRead(BaseModel):
+    id: uuid.UUID
+    title: str
+    reward_point: int
+    duration_seconds: int
+    video_url: str
