@@ -15,11 +15,13 @@ def _create_viewer_with_token(db_session: Session, email: str = "viewer-reward@e
     return viewer, create_access_token(subject=viewer.email)
 
 
-def _create_ad(db_session: Session, reward_point: int = 10, budget: int = 100) -> Ad:
+def _create_ad(db_session: Session, reward_point: int = 10, budget: int = 100, file_path: str | None = None, duration_seconds: int | None = None) -> Ad:
     ad = Ad(
         advertiser_id=None,
         title="Rewarded Ad",
         video_url="https://example.com/rewarded.mp4",
+        file_path=file_path,
+        duration_seconds=duration_seconds,
         reward_point=reward_point,
         budget=budget,
         remaining_budget=budget,
@@ -105,12 +107,12 @@ def test_same_user_cannot_claim_same_ad_reward_twice(client, db_session: Session
 def test_available_ads_returns_only_active_with_budget(client, db_session: Session) -> None:
     _, token = _create_viewer_with_token(db_session, email='viewer-available@example.com')
 
-    eligible_ad = _create_ad(db_session, reward_point=10, budget=50)
-    ineligible_ad = _create_ad(db_session, reward_point=100, budget=100)
+    eligible_ad = _create_ad(db_session, reward_point=10, budget=50, file_path="/media/ads/eligible.mp4", duration_seconds=30)
+    ineligible_ad = _create_ad(db_session, reward_point=100, budget=100, file_path="/media/ads/ineligible.mp4", duration_seconds=30)
     ineligible_ad.remaining_budget = 10
     db_session.commit()
 
-    inactive_ad = _create_ad(db_session, reward_point=10, budget=50)
+    inactive_ad = _create_ad(db_session, reward_point=10, budget=50, file_path="/media/ads/inactive.mp4", duration_seconds=30)
     inactive_ad.is_active = False
     db_session.commit()
 
