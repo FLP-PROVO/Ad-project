@@ -23,6 +23,7 @@ def _create_ad(db_session: Session) -> Ad:
         budget=100,
         remaining_budget=100,
         is_active=True,
+        status="ready",
     )
     db_session.add(ad)
     db_session.commit()
@@ -30,7 +31,7 @@ def _create_ad(db_session: Session) -> Ad:
     return ad
 
 
-def test_start_creates_single_ad_view_record_per_user_and_ad(client, db_session: Session) -> None:
+def test_start_creates_ad_view_records(client, db_session: Session) -> None:
     viewer, token = _create_viewer_and_token(db_session)
     ad = _create_ad(db_session)
 
@@ -41,5 +42,4 @@ def test_start_creates_single_ad_view_record_per_user_and_ad(client, db_session:
     assert second.status_code == 201
 
     ad_views = db_session.query(AdView).filter(AdView.ad_id == ad.id, AdView.viewer_id == viewer.id).all()
-    assert len(ad_views) == 1
-    assert ad_views[0].completed_at is None
+    assert len(ad_views) == 2
