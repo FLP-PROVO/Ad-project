@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import create_access_token, hash_password
 from app.models.ad import Ad
-from app.models.ad_view import AdView
+from app.models.ad_views import AdView
 from app.models.user import User, UserRole
 
 
@@ -42,4 +42,4 @@ def test_start_creates_single_ad_view_record_per_user_and_ad(client, db_session:
 
     ad_views = db_session.query(AdView).filter(AdView.ad_id == ad.id, AdView.viewer_id == viewer.id).all()
     assert len(ad_views) == 1
-    assert ad_views[0].completed is False
+    assert ad_views[0].completed_at is None
