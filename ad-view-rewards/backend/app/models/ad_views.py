@@ -20,7 +20,6 @@ class AdView(Base):
             "viewer_id",
             "ad_id",
             sa.text("date(created_at)"),
-            unique=True,
         ),
     )
 

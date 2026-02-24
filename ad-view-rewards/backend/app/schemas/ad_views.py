@@ -11,6 +11,22 @@ class AdViewCreate(BaseModel):
     client_info: dict | None = None
 
 
+class AdViewStartResponse(BaseModel):
+    view_id: uuid.UUID
+    started_at: datetime
+
+
+class AdViewCompleteRequest(BaseModel):
+    view_id: uuid.UUID
+    watched_seconds: int = Field(ge=0)
+
+
+class AdViewCompleteResponse(BaseModel):
+    status: str
+    rewarded_points: int
+    new_balance: int
+
+
 class AdViewResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

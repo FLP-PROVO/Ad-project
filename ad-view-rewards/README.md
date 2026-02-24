@@ -163,3 +163,58 @@ npm run dev
 
 - `SECRET_KEY`: 署名トークン用シークレット（コードに直書きしない）
 - `BASE_URL`: 署名 URL のホスト（例: `https://backend.example.com`）
+
+## 視聴開始 / 視聴完了 API（報酬付与トランザクション）
+
+### POST `/api/v1/ads/{ad_id}/start`
+
+- 認証: viewer ロール必須
+- レート制限: ユーザーごとに 10 req / 分
+- `ad_views` に `started_at`, `client_info.user_agent`, `client_info.ip_hash` を保存
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/ads/<ad_id>/start" \
+  -H "Authorization: Bearer <viewer_token>"
+```
+
+レスポンス例:
+
+```json
+{
+  "view_id": "c8f7d3f9-bf53-4308-8590-4d7fda5f97ea",
+  "started_at": "2026-10-05T12:30:00Z"
+}
+```
+
+### POST `/api/v1/ads/{ad_id}/complete`
+
+- 認証: viewer ロール必須
+- レート制限: ユーザーごとに 10 req / 分
+- 必須 body: `view_id`, `watched_seconds`
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/ads/<ad_id>/complete" \
+  -H "Authorization: Bearer <viewer_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"view_id":"<view_id>","watched_seconds":25}'
+```
+
+成功時:
+
+```json
+{
+  "status": "rewarded",
+  "rewarded_points": 10,
+  "new_balance": 120
+}
+```
+
+### トランザクション実装メモ
+
+`app/services/rewards.py` で報酬処理を一元化しています。
+
+- `SELECT ... FOR UPDATE` で `ads` と `ad_views` をロック
+- 残予算チェック (`remaining_budget >= reward_point`) をロック後に再検証
+- `points_ledger` 追加 + `ad_views.rewarded=true` + `ads.remaining_budget` 減算を同一 transaction で実行
+- 完了後に `SUM(points_ledger.change)` で `new_balance` を返却
+- 途中失敗時は rollback され、予算減算や rewarded フラグだけが残る不整合を防止

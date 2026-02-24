@@ -1,25 +1,50 @@
-import uuid
 import hashlib
-from datetime import datetime, timezone
+import logging
+import threading
+import time
+import uuid
+from collections import defaultdict, deque
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Request, status
-
-from app.services.storage_service import LocalStorageService
-from sqlalchemy.exc import IntegrityError
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from app.core.security import get_current_user, get_current_viewer
+from app.core.security import get_current_viewer
 from app.db.base import get_db
 from app.models.ad import Ad
 from app.models.ad_views import AdView
-from app.models.points_ledger import PointsLedger
-from app.services.ad_views_service import create_ad_view
 from app.models.user import User
-from app.schemas.ad import AdAvailableRead, AdRead
-from app.schemas.ad_views import AdViewResponse
+from app.schemas.ad import AdAvailableRead
+from app.schemas.ad_views import AdViewCompleteRequest, AdViewCompleteResponse, AdViewStartResponse
+from app.services.ad_views_service import create_ad_view
+from app.services.rewards import InsufficientWatchTimeError, RewardProcessingError, process_ad_reward
+from app.services.storage_service import LocalStorageService
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+class InMemoryRateLimiter:
+    def __init__(self, limit: int, window_seconds: int) -> None:
+        self.limit = limit
+        self.window_seconds = window_seconds
+        self._hits: dict[str, deque[float]] = defaultdict(deque)
+        self._lock = threading.Lock()
+
+    def check(self, key: str) -> None:
+        now = time.time()
+        with self._lock:
+            q = self._hits[key]
+            while q and now - q[0] > self.window_seconds:
+                q.popleft()
+            if len(q) >= self.limit:
+                raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="rate_limit_exceeded")
+            q.append(now)
+
+
+start_rate_limiter = InMemoryRateLimiter(limit=10, window_seconds=60)
+complete_rate_limiter = InMemoryRateLimiter(limit=10, window_seconds=60)
 
 
 def _build_client_info(request: Request) -> dict[str, str | None]:
@@ -31,36 +56,25 @@ def _build_client_info(request: Request) -> dict[str, str | None]:
     }
 
 
-@router.get(
-    "/available",
-    response_model=list[AdAvailableRead],
-    responses={
-        200: {
-            "description": "Active ads available for viewing",
-            "content": {
-                "application/json": {
-                    "examples": {
-                        "available_ads": {
-                            "value": [
-                                {
-                                    "id": "2ffba427-9124-4965-b502-68a035ecf55a",
-                                    "advertiser_id": "5fba7f47-b6d5-4ca9-a18a-b76266b6ee95",
-                                    "title": "Gaming Headset Promo",
-                                    "video_url": "https://example.com/video.mp4",
-                                    "reward_point": 10,
-                                    "budget": 100,
-                                    "remaining_budget": 90,
-                                    "is_active": True,
-                                    "created_at": "2026-10-05T12:00:00Z",
-                                }
-                            ]
-                        }
-                    }
-                }
-            },
-        }
-    },
-)
+def _log_suspicious_complete(db: Session, user_id: uuid.UUID, ad_id: uuid.UUID, ip_hash: str | None) -> None:
+    recent_user_completes = (
+        db.query(AdView)
+        .filter(AdView.viewer_id == user_id, AdView.rewarded.is_(True))
+        .order_by(AdView.created_at.desc())
+        .limit(5)
+        .count()
+    )
+    if recent_user_completes >= 5:
+        logger.warning("suspicious_complete_burst user=%s ad=%s ip_hash=%s", user_id, ad_id, ip_hash)
+
+    if ip_hash:
+        recent_views = db.query(AdView.viewer_id, AdView.client_info).order_by(AdView.created_at.desc()).limit(200).all()
+        same_ip_accounts = len({viewer for viewer, info in recent_views if (info or {}).get("ip_hash") == ip_hash})
+        if same_ip_accounts >= 3:
+            logger.warning("suspicious_same_ip_multi_account user=%s ad=%s ip_hash=%s", user_id, ad_id, ip_hash)
+
+
+@router.get("/available", response_model=list[AdAvailableRead])
 def list_available_ads(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_viewer),
@@ -79,145 +93,76 @@ def list_available_ads(
     )
 
     storage = LocalStorageService()
-    result: list[AdAvailableRead] = []
-    for ad in ads:
-        if ad.file_path is None or ad.duration_seconds is None:
-            continue
-        result.append(
-            AdAvailableRead(
-                id=ad.id,
-                title=ad.title,
-                reward_point=ad.reward_point,
-                duration_seconds=ad.duration_seconds,
-                video_url=storage.generate_signed_url(ad.file_path, current_user.id, expires_seconds=300),
-            )
+    return [
+        AdAvailableRead(
+            id=ad.id,
+            title=ad.title,
+            reward_point=ad.reward_point,
+            duration_seconds=ad.duration_seconds,
+            video_url=storage.generate_signed_url(ad.file_path, current_user.id, expires_seconds=300),
         )
-    return result
+        for ad in ads
+        if ad.file_path is not None and ad.duration_seconds is not None
+    ]
 
 
-@router.post(
-    "/{ad_id}/start",
-    response_model=AdViewResponse,
-    status_code=status.HTTP_201_CREATED,
-    responses={
-        201: {
-            "description": "Ad view started",
-            "content": {
-                "application/json": {
-                    "examples": {
-                        "started": {
-                            "value": {
-                                "id": "01c10ea3-18de-4caf-9f63-983f535dfdc0",
-                                "ad_id": "2ffba427-9124-4965-b502-68a035ecf55a",
-                                "viewer_id": "17cf3f5f-03bb-492a-bbc4-34a6ad4a4353",
-                                "started_at": "2026-10-05T12:30:00Z",
-                                "completed_at": None,
-                                "watched_seconds": None,
-                                "completion_rate": None,
-                                "rewarded": False,
-                                "rewarded_points": 0,
-                                "client_info": {"user_agent": "Mozilla/5.0", "ip_hash": "abc"},
-                                "created_at": "2026-10-05T12:30:00Z",
-                            }
-                        }
-                    }
-                }
-            },
-        }
-    },
-)
+@router.post("/{ad_id}/start", response_model=AdViewStartResponse, status_code=status.HTTP_201_CREATED)
 def start_ad_view(
     ad_id: Annotated[uuid.UUID, Path(examples=["2ffba427-9124-4965-b502-68a035ecf55a"])],
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> AdViewResponse:
-    ad = db.query(Ad).filter(Ad.id == ad_id).first()
-    if ad is None or not ad.is_active:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Active ad not found")
+    current_user: User = Depends(get_current_viewer),
+) -> AdViewStartResponse:
+    start_rate_limiter.check(f"start:{current_user.id}")
 
-    existing = db.query(AdView).filter(AdView.ad_id == ad.id, AdView.viewer_id == current_user.id).first()
-    if existing:
-        return AdViewResponse.model_validate(existing)
+    ad = db.query(Ad).filter(Ad.id == ad_id, Ad.status == "ready", Ad.is_active.is_(True)).first()
+    if ad is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="ad_not_found")
 
-    try:
-        ad_view = create_ad_view(db, ad.id, current_user.id, _build_client_info(request))
-    except IntegrityError:
-        db.rollback()
-        ad_view = db.query(AdView).filter(AdView.ad_id == ad.id, AdView.viewer_id == current_user.id).first()
-        if ad_view is None:
-            raise
-        return AdViewResponse.model_validate(ad_view)
-
-    return AdViewResponse.model_validate(ad_view)
+    ad_view = create_ad_view(db, ad.id, current_user.id, _build_client_info(request))
+    return AdViewStartResponse(view_id=ad_view.id, started_at=ad_view.started_at)
 
 
-@router.post(
-    "/{ad_id}/complete",
-    response_model=AdViewResponse,
-    responses={
-        200: {
-            "description": "Ad view completed and reward granted if eligible",
-            "content": {
-                "application/json": {
-                    "examples": {
-                        "completed": {
-                            "value": {
-                                "id": "01c10ea3-18de-4caf-9f63-983f535dfdc0",
-                                "ad_id": "2ffba427-9124-4965-b502-68a035ecf55a",
-                                "viewer_id": "17cf3f5f-03bb-492a-bbc4-34a6ad4a4353",
-                                "started_at": "2026-10-05T12:30:00Z",
-                                "completed_at": "2026-10-05T12:31:00Z",
-                                "watched_seconds": None,
-                                "completion_rate": None,
-                                "rewarded": True,
-                                "rewarded_points": 10,
-                                "client_info": {"user_agent": "Mozilla/5.0", "ip_hash": "abc"},
-                                "created_at": "2026-10-05T12:30:00Z",
-                            }
-                        }
-                    }
-                }
-            },
-        }
-    },
-)
+@router.post("/{ad_id}/complete", response_model=AdViewCompleteResponse)
 def complete_ad_view(
     ad_id: Annotated[uuid.UUID, Path(examples=["2ffba427-9124-4965-b502-68a035ecf55a"])],
+    payload: AdViewCompleteRequest,
+    request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> AdViewResponse:
-    ad = db.query(Ad).filter(Ad.id == ad_id).first()
-    if ad is None or not ad.is_active:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Active ad not found")
+    current_user: User = Depends(get_current_viewer),
+) -> AdViewCompleteResponse | JSONResponse:
+    complete_rate_limiter.check(f"complete:{current_user.id}")
 
-    ad_view = db.query(AdView).filter(AdView.ad_id == ad.id, AdView.viewer_id == current_user.id).first()
-    if ad_view is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ad view not started")
+    client_info = _build_client_info(request)
+    _log_suspicious_complete(db, current_user.id, ad_id, client_info.get("ip_hash"))
 
-    now = datetime.now(timezone.utc)
-    with db.begin_nested():
-        ad = db.query(Ad).filter(Ad.id == ad.id).with_for_update().one()
-        ad_view = db.query(AdView).filter(AdView.id == ad_view.id).with_for_update().one()
+    try:
+        status_text, rewarded_points, new_balance = process_ad_reward(
+            db,
+            ad_id=ad_id,
+            view_id=payload.view_id,
+            viewer_id=current_user.id,
+            watched_seconds=payload.watched_seconds,
+        )
+    except InsufficientWatchTimeError as exc:
+        logger.info(
+            "insufficient_watch_time user=%s ad=%s ip_hash=%s required_seconds=%s",
+            current_user.id,
+            ad_id,
+            client_info.get("ip_hash"),
+            exc.required_seconds,
+        )
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"detail": "insufficient_watch_time", "required_seconds": exc.required_seconds},
+        )
+    except RewardProcessingError as exc:
+        logger.exception(
+            "reward_processing_failed user=%s ad=%s ip_hash=%s",
+            current_user.id,
+            ad_id,
+            client_info.get("ip_hash"),
+        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="server_error") from exc
 
-        if ad_view.completed_at is None:
-            ad_view.completed_at = now
-
-        if not ad_view.rewarded:
-            if ad.remaining_budget < ad.reward_point:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient ad budget")
-
-            ledger_entry = PointsLedger(
-                user_id=current_user.id,
-                change=ad.reward_point,
-                reason="ad_reward",
-                reference_id=ad_view.id,
-            )
-            db.add(ledger_entry)
-            ad.remaining_budget -= ad.reward_point
-            ad_view.rewarded = True
-            ad_view.rewarded_points = ad.reward_point
-
-    db.commit()
-    db.refresh(ad_view)
-    return AdViewResponse.model_validate(ad_view)
+    return AdViewCompleteResponse(status=status_text, rewarded_points=rewarded_points, new_balance=new_balance)
