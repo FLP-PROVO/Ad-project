@@ -5,7 +5,7 @@ from alembic.config import Config
 from sqlalchemy import create_engine, inspect
 
 
-def test_alembic_upgrade_creates_users_ads_rewards_and_gift_codes_tables() -> None:
+def test_alembic_upgrade_creates_tables_and_ad_file_columns() -> None:
     backend_dir = Path(__file__).resolve().parents[1]
     sqlite_path = backend_dir / "test_migration.db"
     db_url = f"sqlite+pysqlite:///{sqlite_path}"
@@ -23,5 +23,11 @@ def test_alembic_upgrade_creates_users_ads_rewards_and_gift_codes_tables() -> No
     assert "ad_views" in table_names
     assert "points_ledger" in table_names
     assert "gift_codes" in table_names
+
+    ad_columns = {column["name"] for column in inspector.get_columns("ads")}
+    assert "file_path" in ad_columns
+    assert "duration_seconds" in ad_columns
+    assert "file_size_bytes" in ad_columns
+    assert "status" in ad_columns
 
     sqlite_path.unlink(missing_ok=True)

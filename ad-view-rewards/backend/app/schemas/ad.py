@@ -33,6 +33,10 @@ class AdRead(BaseModel):
     advertiser_id: uuid.UUID | None
     title: str
     video_url: str
+    file_path: str | None
+    duration_seconds: int | None
+    file_size_bytes: int | None
+    status: str
     reward_point: int
     budget: int
     remaining_budget: int

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String, Uuid, func, text
+from sqlalchemy import BIGINT, Boolean, DateTime, Integer, String, Text, Uuid, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -14,6 +14,10 @@ class Ad(Base):
     advertiser_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     video_url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    file_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    file_size_bytes: Mapped[int | None] = mapped_column(BIGINT, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="ready", server_default="ready")
     reward_point: Mapped[int] = mapped_column(Integer, nullable=False)
     budget: Mapped[int] = mapped_column(Integer, nullable=False)
     remaining_budget: Mapped[int] = mapped_column(Integer, nullable=False)
